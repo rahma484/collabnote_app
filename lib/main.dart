@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'config/dependencies.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,16 +11,10 @@ Future<void> main() async {
     url: const String.fromEnvironment('SUPABASE_URL'),
     publishableKey: const String.fromEnvironment('SUPABASE_KEY'),
   );
-  try {
-  await Supabase.instance.client
-      .from('projects')
-      .select('id')
-      .limit(1);
 
-  debugPrint('KONEKSI SUPABASE BERHASIL');
-} catch (e) {
-  debugPrint('KONEKSI SUPABASE GAGAL: $e');
-}
-
-  runApp(const CollabNoteApp());
+  runApp(
+    const AppDependencies(
+      child: CollabNoteApp(),
+    ),
+  );
 }

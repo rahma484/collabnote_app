@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ui/shell/app_shell.dart';
+
 class CollabNoteApp extends StatelessWidget {
   const CollabNoteApp({super.key});
 
@@ -9,20 +11,22 @@ class CollabNoteApp extends StatelessWidget {
       title: 'CollabNote',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue, // Warna biru sesuai preferensi UI/UX kamu sebelumnya
-        ),
         useMaterial3: true,
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'Setup Berhasil!\nKoneksi Supabase & Provider Aman.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+        fontFamily: 'Inter',
+        scaffoldBackgroundColor: const Color(0xFFF8F9FC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF635BDB),
+          primary: const Color(0xFF635BDB),
+          surface: const Color(0xFFF8F9FC),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF8F9FC),
+          foregroundColor: Color(0xFF20243A),
+          elevation: 0,
+          centerTitle: false,
         ),
       ),
+      home: const AppShell(),
     );
   }
 }
