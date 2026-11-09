@@ -1,17 +1,26 @@
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'config/dependencies.dart';
 import 'app.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://hdekkyakizsuwjlqbtef.supabase.co/rest/v1/',
-    publishableKey: 'sb_publishable_5BgUL9Zh4h8b5hL9T4tZJA_DtObXOUI',
+    url: const String.fromEnvironment('SUPABASE_URL'),
+    publishableKey: const String.fromEnvironment('SUPABASE_KEY'),
   );
+  try {
+  await Supabase.instance.client
+      .from('projects')
+      .select('id')
+      .limit(1);
 
-  runApp(MultiProvider(providers: providers, child: const CollabNoteApp()));
+  debugPrint('KONEKSI SUPABASE BERHASIL');
+} catch (e) {
+  debugPrint('KONEKSI SUPABASE GAGAL: $e');
+}
+
+  runApp(const CollabNoteApp());
 }
