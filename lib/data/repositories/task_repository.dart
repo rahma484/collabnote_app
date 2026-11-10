@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/task.dart';
@@ -7,6 +9,9 @@ class TaskRepository extends ChangeNotifier {
   final CollabNoteService _service;
 
   List<Task> _tasks = [];
+
+  StreamSubscription<List<Map<String, dynamic>>>? _subscription;
+  String? _watchedProjectId;
 
   TaskRepository(this._service);
 
@@ -18,8 +23,28 @@ class TaskRepository extends ChangeNotifier {
   List<Task> get completedTasks =>
       _tasks.where((task) => task.isCompleted).toList();
 
+  List<Task> tasksForProject(String projectId) =>
+      _tasks.where((task) => task.projectId == projectId).toList();
+
+  /// Dipanggil saat pindah akun agar data pengguna lama tidak tampil.
+  void clear() {
+    stopWatching();
+    _tasks = [];
+  }
+
+  void _replaceProjectTasks(String projectId, List<Task> projectTasks) {
+    _tasks = [
+      ..._tasks.where((task) => task.projectId != projectId),
+      ...projectTasks,
+    ];
+  }
+
+  /// Memuat tugas satu proyek tanpa menghapus tugas proyek lain,
+  /// sehingga Beranda dan Checklist tetap lengkap.
   Future<void> loadTasks(String projectId) async {
-    _tasks = await _service.fetchTasks(projectId);
+    final fetched = await _service.fetchTasks(projectId);
+
+    _replaceProjectTasks(projectId, fetched);
     notifyListeners();
   }
 
@@ -38,6 +63,35 @@ class TaskRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Supabase Realtime: perubahan tugas dari HP anggota lain
+  /// langsung masuk ke sini dan memicu notifyListeners().
+  void watchProject(String projectId) {
+    if (_watchedProjectId == projectId) return;
+
+    stopWatching();
+    _watchedProjectId = projectId;
+
+    _subscription = _service.streamTasks(projectId).listen(
+      (rows) {
+        final fetched = rows.map(Task.fromJson).toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+        _replaceProjectTasks(projectId, fetched);
+        notifyListeners();
+      },
+      onError: (Object error) {
+        // Koneksi realtime putus: data terakhir tetap ditampilkan.
+        debugPrint('Realtime tasks error: $error');
+      },
+    );
+  }
+
+  void stopWatching() {
+    _subscription?.cancel();
+    _subscription = null;
+    _watchedProjectId = null;
+  }
+
   Future<void> addTask({
     required String projectId,
     required String title,
@@ -49,7 +103,11 @@ class TaskRepository extends ChangeNotifier {
       assignee: assignee,
     );
 
-    _tasks = [..._tasks, newTask];
+    // Stream realtime bisa saja sudah membawa tugas ini lebih dulu.
+    if (!_tasks.any((task) => task.id == newTask.id)) {
+      _tasks = [..._tasks, newTask];
+    }
+
     notifyListeners();
   }
 
@@ -72,10 +130,27 @@ class TaskRepository extends ChangeNotifier {
     await updateTask(updatedTask);
   }
 
+  /// Pindah kolom di Task Board (To Do / In Progress / Done).
+  /// isCompleted ikut disinkronkan agar Checklist & Beranda konsisten.
+  Future<void> moveTask(Task task, String status) async {
+    final updatedTask = task.copyWith(
+      status: status,
+      isCompleted: status == 'Done',
+    );
+
+    await updateTask(updatedTask);
+  }
+
   Future<void> removeTask(String taskId) async {
     await _service.deleteTask(taskId);
 
     _tasks = _tasks.where((task) => task.id != taskId).toList();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    stopWatching();
+    super.dispose();
   }
 }

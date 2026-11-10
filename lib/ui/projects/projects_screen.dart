@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/models/project.dart';
 import 'projects_view_model.dart';
 
 class ProjectsScreen extends StatelessWidget {
   final ProjectsViewModel viewModel;
+  final void Function(Project project) onOpenProject;
 
   const ProjectsScreen({
     super.key,
     required this.viewModel,
+    required this.onOpenProject,
   });
 
   @override
@@ -99,6 +102,7 @@ class ProjectsScreen extends StatelessWidget {
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.all(14),
+                              onTap: () => onOpenProject(project),
                               leading: const CircleAvatar(
                                 backgroundColor: Color(0xFFEFEDFF),
                                 child: Icon(

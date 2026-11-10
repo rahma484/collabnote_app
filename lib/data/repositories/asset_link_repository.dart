@@ -10,6 +10,16 @@ class AssetLinkRepository {
     return _service.fetchAssetLinks(projectId);
   }
 
+  /// Stream realtime: berisi daftar tautan terbaru setiap ada perubahan
+  /// (tambah / hapus) dari anggota mana pun.
+  Stream<List<AssetLink>> watchAssetLinks(String projectId) {
+    return _service.streamAssetLinks(projectId).map((rows) {
+      final links = rows.map(AssetLink.fromJson).toList();
+      links.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return links;
+    });
+  }
+
   Future<AssetLink> addAssetLink({
     required String projectId,
     required String title,

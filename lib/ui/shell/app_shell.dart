@@ -4,12 +4,17 @@ import 'package:provider/provider.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/asset_link_repository.dart';
+import '../../domain/models/project.dart';
 
 import '../home/home_view_model.dart';
 import '../home/home_screen.dart';
 
 import '../projects/projects_view_model.dart';
 import '../projects/projects_screen.dart';
+import '../projects/create_project_screen.dart';
+
+import '../project_detail/project_detail_screen.dart';
+import '../profile/profile_screen.dart';
 
 import '../checklist/checklist_view_model.dart';
 import '../checklist/checklist_screen.dart';
@@ -40,6 +45,10 @@ class _AppShellState extends State<AppShell> {
     final taskRepository = context.read<TaskRepository>();
     final assetLinkRepository = context.read<AssetLinkRepository>();
 
+    // Buang sisa data akun sebelumnya (jika pengguna baru saja
+    // keluar lalu masuk dengan akun lain).
+    taskRepository.clear();
+
     _homeViewModel = HomeViewModel(
       projectRepository: projectRepository,
       taskRepository: taskRepository,
@@ -54,21 +63,55 @@ class _AppShellState extends State<AppShell> {
 
     _assetsViewModel = AssetsViewModel(assetLinkRepository);
 
-    _initialize();
+    _reloadAll();
   }
 
-  Future<void> _initialize() async {
+  /// Memuat ulang Beranda, Proyek, dan Checklist.
+  /// Tab Assets memuat sendiri setelah daftar proyek tersedia.
+  Future<void> _reloadAll() async {
     await Future.wait([
       _homeViewModel.load(),
       _projectsViewModel.load(),
       _checklistViewModel.load(),
     ]);
+  }
 
-    if (_homeViewModel.projects.isNotEmpty) {
-      await _assetsViewModel.load(
-        _homeViewModel.projects.first.id,
-      );
+  Future<void> _openCreateProject() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateProjectScreen(
+          viewModel: _projectsViewModel,
+        ),
+      ),
+    );
+
+    if (created == true && mounted) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+
+      await _reloadAll();
     }
+  }
+
+  Future<void> _openProject(Project project) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ProjectDetailScreen(project: project),
+      ),
+    );
+
+    if (deleted == true && mounted) {
+      await _reloadAll();
+    }
+  }
+
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(),
+      ),
+    );
   }
 
   @override
@@ -84,8 +127,16 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomeScreen(viewModel: _homeViewModel),
-      ProjectsScreen(viewModel: _projectsViewModel),
+      HomeScreen(
+        viewModel: _homeViewModel,
+        onCreateProject: _openCreateProject,
+        onOpenProject: _openProject,
+        onOpenProfile: _openProfile,
+      ),
+      ProjectsScreen(
+        viewModel: _projectsViewModel,
+        onOpenProject: _openProject,
+      ),
       ChecklistScreen(viewModel: _checklistViewModel),
       AssetsScreen(
         viewModel: _assetsViewModel,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'ui/shell/app_shell.dart';
+import 'ui/auth/auth_gate.dart';
+import 'ui/core/app_theme.dart';
 
 class CollabNoteApp extends StatelessWidget {
   const CollabNoteApp({super.key});
@@ -10,23 +11,8 @@ class CollabNoteApp extends StatelessWidget {
     return MaterialApp(
       title: 'CollabNote',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Inter',
-        scaffoldBackgroundColor: const Color(0xFFF8F9FC),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF635BDB),
-          primary: const Color(0xFF635BDB),
-          surface: const Color(0xFFF8F9FC),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF8F9FC),
-          foregroundColor: Color(0xFF20243A),
-          elevation: 0,
-          centerTitle: false,
-        ),
-      ),
-      home: const AppShell(),
+      theme: AppTheme.light,
+      home: const AuthGate(),
     );
   }
 }
