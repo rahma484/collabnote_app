@@ -1,6 +1,5 @@
 
 import 'dart:typed_data';
-import 'template_document_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +9,7 @@ import '../../data/services/local_file_service.dart';
 import '../../domain/models/template_model.dart';
 import '../core/app_colors.dart';
 import '../core/app_widgets.dart';
+import '../viewer/document_viewer_screen.dart';
 import 'template_gallery_screen.dart';
 import 'template_gallery_view_model.dart';
 
@@ -27,30 +27,33 @@ class TemplatePreviewScreen extends StatelessWidget {
   });
 
   Future<void> _download(BuildContext context) async {
-    final bytes = await context.read<TemplateRepository>().bytesOf(template);
-    if (!context.mounted) return;
-    if (bytes == null) {
-      showSnack(context, 'File template tidak ditemukan.');
-      return;
+    try {
+      final bytes = await context.read<TemplateRepository>().bytesOf(template);
+      if (!context.mounted) return;
+      if (bytes == null) {
+        showSnack(context, 'File template tidak ditemukan.');
+        return;
+      }
+      final ok = await context.read<LocalFileService>().exportBytes(template.fileName, bytes);
+      if (!context.mounted) return;
+      showSnack(context, ok ? 'Template diunduh: ${template.fileName}' : 'Unduhan dibatalkan.');
+    } catch (e) {
+      if (context.mounted) showSnack(context, 'Template gagal diunduh: $e');
     }
-    final ok = await context.read<LocalFileService>().exportBytes(template.fileName, bytes);
-    if (!context.mounted) return;
-    showSnack(context, ok ? 'Template disimpan: ${template.fileName}' : 'Unduhan dibatalkan.');
   }
 
-  // Membuka dokumen template
+  // Membuka template langsung di dalam aplikasi (tanpa mengunduh).
   Future<void> _openTemplate(BuildContext context) async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TemplateDocumentScreen(
-          template: template,
-        ),
-      ),
-    );
-
-    if (result == true && context.mounted) {
-      Navigator.pop(context, template);
+    try {
+      final bytes = await context.read<TemplateRepository>().bytesOf(template);
+      if (!context.mounted) return;
+      if (bytes == null) {
+        showSnack(context, 'File template tidak ditemukan.');
+        return;
+      }
+      await openFileInApp(context, fileName: template.fileName, bytes: bytes, title: template.title);
+    } catch (e) {
+      if (context.mounted) showSnack(context, 'Template gagal dibuka: $e');
     }
   }
 
@@ -136,7 +139,7 @@ class TemplatePreviewScreen extends StatelessWidget {
           const SectionTitle('Pratinjau Isi Template'),
           if (!isImage)
             const Text(
-              'Pratinjau menampilkan kerangka dan struktur dokumen. Untuk membuka isi file aslinya, unduh template lalu buka dengan Word, Excel, atau PowerPoint.',
+              'Pratinjau menampilkan kerangka dan struktur dokumen. Tekan "Buka Template" untuk melihat isi file aslinya, atau "Unduh Template" untuk menyimpannya.',
               style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
           Container(

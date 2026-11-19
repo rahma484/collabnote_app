@@ -14,14 +14,18 @@ Future<bool> exportFile(String fileName, Uint8List bytes) async {
 
   final url = web.URL.createObjectURL(blob);
 
-  final anchor = web.HTMLAnchorElement()
+  final anchor = web.document.createElement('a') as web.HTMLAnchorElement
     ..href = url
-    ..download = fileName;
+    ..download = fileName
+    ..style.display = 'none';
 
+  // Anchor dipasang ke halaman dahulu; tanpa ini beberapa browser mengabaikan klik.
+  web.document.body!.append(anchor);
   anchor.click();
+  anchor.remove();
 
   Timer(
-    const Duration(seconds: 2),
+    const Duration(seconds: 5),
     () => web.URL.revokeObjectURL(url),
   );
 

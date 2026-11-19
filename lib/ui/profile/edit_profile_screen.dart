@@ -77,7 +77,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               listenable: vm,
               builder: (context, _) => Column(
                 children: [
-                  ProfileAvatar(name: _name.text, photoPath: vm.user.photoPath),
+                  ProfileAvatar(name: _name.text, photoPath: vm.user.photoPath, heroTag: 'profile-avatar'),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

@@ -10,6 +10,8 @@ import '../data/repositories/template_repository.dart';
 import '../data/repositories/workspace_repository.dart';
 import '../data/services/collab_note_service.dart';
 import '../data/services/local_file_service.dart';
+import '../data/services/draft_store.dart';
+import '../ui/core/theme_controller.dart';
 import '../ui/shell/navigation_controller.dart';
 
 /// Pendaftaran Service dan semua Repository (Dependency Injection dengan Provider).
@@ -26,6 +28,10 @@ class AppDependencies extends StatelessWidget {
         // Service
         Provider<CollabNoteService>(create: (_) => CollabNoteService()),
         Provider<LocalFileService>(create: (_) => LocalFileService()),
+        Provider<DraftStore>(create: (_) => DraftStore()),
+
+        // Preferensi tema (Terang/Gelap) disimpan di SharedPreferences
+        ChangeNotifierProvider<ThemeController>(create: (_) => ThemeController()..load()),
 
         // Repository (semuanya ChangeNotifier supaya seluruh halaman ikut berubah)
         ChangeNotifierProvider<ProfileRepository>(

@@ -8,6 +8,7 @@ import '../../domain/models/work_item_model.dart';
 import '../core/app_colors.dart';
 import '../core/app_widgets.dart';
 import '../core/formatters.dart';
+import '../viewer/document_viewer_screen.dart';
 import 'documents_screen.dart';
 import 'workspace_view_model.dart';
 
@@ -198,6 +199,20 @@ class _WorkItemSheetState extends State<_WorkItemSheet> {
         actions: [
           TextButton(
             onPressed: () async {
+              final bytes = await vm.bytesOfSubmission(s);
+              if (!context.mounted) return;
+              if (bytes == null) {
+                // ignore: use_build_context_synchronously
+                showSnack(context, 'Berkas contoh ini tidak memiliki isi file.');
+                return;
+              }
+              // ignore: use_build_context_synchronously
+              await openFileInApp(context, fileName: s.fileName, bytes: bytes, title: s.fileName);
+            },
+            child: const Text('Buka'),
+          ),
+          TextButton(
+            onPressed: () async {
               final msg = await vm.downloadSubmission(s);
               // ignore: use_build_context_synchronously
               if (context.mounted) showSnack(context, msg);
@@ -282,6 +297,15 @@ class _WorkItemSheetState extends State<_WorkItemSheet> {
                     leading: const Icon(Icons.attach_file, color: AppColors.mocca),
                     title: Text(item.attachmentName!, maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: const Text('Lampiran instruksi pekerjaan'),
+                    onTap: () async {
+                      final bytes = await vm.bytesOfAttachment(item);
+                      if (!context.mounted) return;
+                      if (bytes == null) {
+                        showSnack(context, 'Lampiran tidak ditemukan.');
+                        return;
+                      }
+                      await openFileInApp(context, fileName: item.attachmentName!, bytes: bytes, title: item.attachmentName);
+                    },
                     trailing: IconButton(
                       tooltip: 'Unduh lampiran',
                       icon: const Icon(Icons.download_outlined),

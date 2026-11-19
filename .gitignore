@@ -46,11 +46,3 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
-
-# Local secrets
-.env
-.env.*
-!.env.example
-supabase_config.json
-
-/android/build/

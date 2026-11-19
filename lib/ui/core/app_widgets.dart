@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/models/assignment_model.dart';
 import 'app_colors.dart';
+import 'effects.dart';
+
+export 'charts.dart';
+export 'effects.dart';
 
 // ---------------------------------------------------------------- Transisi
 
@@ -12,10 +17,13 @@ Route<T> slideUpRoute<T>(Widget page) {
     reverseTransitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (_, __, ___) => page,
     transitionsBuilder: (_, animation, __, child) {
-      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-      return SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved),
-        child: child,
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: animation, curve: const Interval(0, 0.7))),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.22), end: Offset.zero).animate(curved),
+          child: child,
+        ),
       );
     },
   );
@@ -49,13 +57,22 @@ class _PressableScaleState extends State<PressableScale> {
       onTapDown: widget.onTap == null ? null : (_) => _set(true),
       onTapUp: (_) => _set(false),
       onTapCancel: () => _set(false),
-      onTap: widget.onTap,
+      onTap: widget.onTap == null
+          ? null
+          : () {
+              HapticFeedback.selectionClick();
+              widget.onTap!();
+            },
       onLongPress: widget.onLongPress,
       child: AnimatedScale(
         scale: _pressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-        child: widget.child,
+        duration: Duration(milliseconds: _pressed ? 90 : 260),
+        curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.9 : 1,
+          duration: const Duration(milliseconds: 90),
+          child: widget.child,
+        ),
       ),
     );
   }
@@ -102,45 +119,16 @@ class _ExpandableCardState extends State<ExpandableCard> {
 }
 
 
-/// Placeholder shimmer ringan untuk menggantikan indikator loading yang berputar.
-class ShimmerLoading extends StatefulWidget {
+/// Kerangka (skeleton) berkilau untuk satu halaman: pengganti indikator loading berputar.
+/// Parameter width/height dipertahankan agar pemanggil lama tetap valid.
+class ShimmerLoading extends StatelessWidget {
   final double width;
   final double height;
-  const ShimmerLoading({super.key, this.width = 230, this.height = 92});
-  @override
-  State<ShimmerLoading> createState() => _ShimmerLoadingState();
-}
 
-class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this, duration: const Duration(milliseconds: 1250))..repeat();
+  const ShimmerLoading({super.key, this.width = 230, this.height = 92});
+
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) => Center(
-    child: AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) => ShaderMask(
-        shaderCallback: (rect) => LinearGradient(
-          begin: Alignment(-1.5 + 3 * _controller.value, 0),
-          end: Alignment(-0.5 + 3 * _controller.value, 0),
-          colors: [AppColors.beige, Colors.white, AppColors.beige],
-        ).createShader(rect),
-        child: Container(
-          width: widget.width, height: widget.height,
-          decoration: BoxDecoration(color: AppColors.beige, borderRadius: BorderRadius.circular(18)),
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(height: 13, width: widget.width * .58, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-            const SizedBox(height: 12),
-            Container(height: 10, width: widget.width * .82, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-            const SizedBox(height: 8),
-            Container(height: 10, width: widget.width * .42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-          ]),
-        ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => const SkeletonList(count: 5, itemHeight: 96);
 }
 
 // ------------------------------------------------------------ Komponen dasar
@@ -195,6 +183,7 @@ class PrimaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Color color;
   final IconData? icon;
+  final bool loading;
 
   const PrimaryButton({
     super.key,
@@ -202,34 +191,44 @@ class PrimaryButton extends StatelessWidget {
     required this.onPressed,
     this.color = AppColors.moccaDark,
     this.icon,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null;
+    final enabled = onPressed != null && !loading;
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null && !loading) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8)],
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Text(
+            loading ? 'Memproses...' : label,
+            key: ValueKey(loading),
+            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
     return PressableScale(
-      onTap: onPressed,
-      child: Container(
+      onTap: enabled ? onPressed : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
         width: double.infinity,
         height: 52,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? color : color.withValues(alpha: 0.35),
+          color: onPressed != null ? color : color.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(14),
+          boxShadow: enabled ? [BoxShadow(color: color.withValues(alpha: 0.28), blurRadius: 12, offset: const Offset(0, 5))] : null,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8)],
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-          ],
-        ),
+        child: loading ? Shimmer(child: content) : content,
       ),
     );
   }
 }
 
-/// Kolom input dengan label di atasnya (sesuai mockup).
 class LabeledField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
@@ -397,31 +396,33 @@ class MemberAvatar extends StatelessWidget {
 class EmptyState extends StatelessWidget {
   final String? image;
   final IconData? icon;
+  final String? title;
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final Color accent;
 
-  const EmptyState({super.key, this.image, this.icon, required this.message, this.actionLabel, this.onAction});
+  const EmptyState({
+    super.key,
+    this.image,
+    this.icon,
+    this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.accent = const Color(0xFFF2D6D0),
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (image != null) Image.asset(image!, height: 170),
-            if (icon != null) Icon(icon, size: 64, color: AppColors.beige),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
-            if (actionLabel != null) ...[
-              const SizedBox(height: 18),
-              PrimaryButton(label: actionLabel!, onPressed: onAction, color: AppColors.brown),
-            ],
-          ],
-        ),
-      ),
+    return AnimatedEmptyState(
+      image: image,
+      icon: icon,
+      title: title,
+      message: message,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      accent: accent,
     );
   }
 }
@@ -644,5 +645,52 @@ class MenuTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Transisi fade + zoom kecil (dipakai antara Auth, Splash, dan aplikasi utama).
+Route<T> fadeScaleRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 450),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (_, __, ___) => page,
+    transitionsBuilder: (_, animation, __, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(scale: Tween<double>(begin: 0.96, end: 1).animate(curved), child: child),
+      );
+    },
+  );
+}
+
+/// Lencana bulat (ikon mode individu/kelompok atau arsip). Jika [heroTag] diberikan, lencana ini
+/// "terbang" mulus dari kartu daftar ke halaman detail (Hero animation).
+class ModeBadge extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final String? heroTag;
+  final Color background;
+  final Color foreground;
+
+  const ModeBadge({
+    super.key,
+    required this.icon,
+    this.size = 44,
+    this.heroTag,
+    this.background = AppColors.chip,
+    this.foreground = AppColors.brown,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      child: Icon(icon, size: size * 0.52, color: foreground),
+    );
+    if (heroTag == null) return badge;
+    return Hero(tag: heroTag!, child: badge);
   }
 }

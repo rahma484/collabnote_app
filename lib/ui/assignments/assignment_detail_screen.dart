@@ -11,15 +11,18 @@ import '../core/formatters.dart';
 import '../shell/navigation_controller.dart';
 import 'assignment_form_screen.dart';
 
-void openAssignmentDetail(BuildContext context, String assignmentId) {
-  pushSlideUp<void>(context, AssignmentDetailScreen(assignmentId: assignmentId));
+void openAssignmentDetail(BuildContext context, String assignmentId, {String? heroTag}) {
+  pushSlideUp<void>(context, AssignmentDetailScreen(assignmentId: assignmentId, heroTag: heroTag));
 }
 
 /// Detail penugasan: informasi lengkap + pintu masuk ke Ruang Kerja.
 class AssignmentDetailScreen extends StatelessWidget {
   final String assignmentId;
 
-  const AssignmentDetailScreen({super.key, required this.assignmentId});
+  /// Tag Hero lencana mode dari kartu asal (null bila dibuka tanpa animasi Hero).
+  final String? heroTag;
+
+  const AssignmentDetailScreen({super.key, required this.assignmentId, this.heroTag});
 
   Future<void> _delete(BuildContext context) async {
     final repo = context.read<AssignmentRepository>();
@@ -64,7 +67,7 @@ class AssignmentDetailScreen extends StatelessWidget {
     final repo = context.watch<AssignmentRepository>();
     final a = repo.byId(assignmentId);
     if (a == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: ShimmerLoading());
     }
     final groups = context.watch<GroupRepository>();
     final workspaces = context.watch<WorkspaceRepository>();
@@ -134,7 +137,13 @@ class AssignmentDetailScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(child: info('Mode Pengerjaan', a.mode.label)),
-              Icon(a.isGroup ? Icons.groups_2_outlined : Icons.person_outline, size: 34, color: AppColors.mocca),
+              ModeBadge(
+                icon: a.isGroup ? Icons.groups_2_outlined : Icons.person_outline,
+                size: 60,
+                heroTag: heroTag,
+                background: AppColors.chip,
+                foreground: AppColors.mocca,
+              ),
             ],
           ),
           if (group != null) info('Kelompok', '${group.name}  •  ${groups.membersOf(group.id).length} anggota'),

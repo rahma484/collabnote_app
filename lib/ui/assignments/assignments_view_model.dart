@@ -25,6 +25,11 @@ class AssignmentsViewModel extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
+  // Infinite scroll: daftar ditampilkan bertahap (halaman demi halaman).
+  static const int pageSize = 6;
+  int visibleCount = pageSize;
+  bool isLoadingMore = false;
+
   AssignmentSegment segment = AssignmentSegment.semua;
   String query = '';
   String? courseFilter; // null = semua mata kuliah
@@ -45,6 +50,35 @@ class AssignmentsViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Tarik-untuk-memuat-ulang: membaca ulang data dari sumber (service) lalu kembali ke halaman pertama.
+  Future<void> refresh() async {
+    try {
+      await assignments.load(force: true);
+      error = null;
+    } catch (e) {
+      error = 'Gagal memuat penugasan: $e';
+    }
+    visibleCount = pageSize;
+    notifyListeners();
+  }
+
+  /// Bagian daftar yang sudah dimuat (infinite scroll).
+  List<AssignmentModel> get visible => filtered.take(visibleCount).toList();
+
+  bool get hasMore => visibleCount < filtered.length;
+
+  Future<void> loadMore() async {
+    if (isLoadingMore || !hasMore) return;
+    isLoadingMore = true;
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 600)); // simulasi permintaan jaringan
+    visibleCount += pageSize;
+    isLoadingMore = false;
+    notifyListeners();
+  }
+
+  void _resetPaging() => visibleCount = pageSize;
 
   bool get hasAnyAssignment => assignments.activeAssignments.isNotEmpty;
 
@@ -99,26 +133,31 @@ class AssignmentsViewModel extends ChangeNotifier {
 
   void setSegment(AssignmentSegment v) {
     segment = v;
+    _resetPaging();
     notifyListeners();
   }
 
   void setQuery(String v) {
     query = v;
+    _resetPaging();
     notifyListeners();
   }
 
   void setCourse(String? v) {
     courseFilter = v;
+    _resetPaging();
     notifyListeners();
   }
 
   void setSemester(int? v) {
     semesterFilter = v;
+    _resetPaging();
     notifyListeners();
   }
 
   void setStatus(String v) {
     statusFilter = v;
+    _resetPaging();
     notifyListeners();
   }
 

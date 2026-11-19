@@ -9,6 +9,7 @@ import '../auth/auth_screen.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_widgets.dart';
+import '../core/theme_controller.dart';
 import 'edit_profile_screen.dart';
 import 'profile_view_model.dart';
 
@@ -16,11 +17,17 @@ class ProfileAvatar extends StatelessWidget {
   final String name;
   final String? photoPath;
   final double size;
+  final String? heroTag;
 
-  const ProfileAvatar({super.key, required this.name, this.photoPath, this.size = 96});
+  const ProfileAvatar({super.key, required this.name, this.photoPath, this.size = 96, this.heroTag});
 
   @override
   Widget build(BuildContext context) {
+    final avatar = _buildAvatar(context);
+    return heroTag == null ? avatar : Hero(tag: heroTag!, child: avatar);
+  }
+
+  Widget _buildAvatar(BuildContext context) {
     final fallback = Container(
       width: size, height: size, alignment: Alignment.center,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.mocca),
@@ -33,7 +40,7 @@ class ProfileAvatar extends StatelessWidget {
       builder: (context, snapshot) {
         final bytes = snapshot.data;
         if (bytes == null) return fallback;
-        return ClipOval(child: Image.memory(bytes, width: size, height: size, fit: BoxFit.cover));
+        return RestoreColors(child: ClipOval(child: Image.memory(bytes, width: size, height: size, fit: BoxFit.cover)));
       },
     );
   }
@@ -67,17 +74,45 @@ class ProfileScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
             children: [
-              Row(
-                children: [
-                  const Expanded(child: Text('Profil', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800))),
-                  const LogoCircleButton(),
-                ],
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: WaveHeader(
+                  height: 250,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Expanded(child: Text('Profil', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800))),
+                          LogoCircleButton(),
+                        ],
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                            child: ProfileAvatar(name: u.name, photoPath: u.photoPath, size: 78, heroTag: 'profile-avatar'),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(u.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+                                Text('NIM ${u.nim.isEmpty ? '-' : u.nim}', style: const TextStyle(color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
-              Center(child: ProfileAvatar(name: u.name, photoPath: u.photoPath)),
-              const SizedBox(height: 12),
-              Center(child: Text(u.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800))),
-              Center(child: Text('NIM ${u.nim.isEmpty ? '-' : u.nim}')),
               const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -138,6 +173,33 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    const Text('Tema', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Consumer<ThemeController>(
+                      builder: (context, theme, _) => SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<AppThemeMode>(
+                          showSelectedIcon: false,
+                          segments: [
+                            for (final m in AppThemeMode.values) ButtonSegment(value: m, label: Text(m.label)),
+                          ],
+                          selected: {theme.mode},
+                          onSelectionChanged: (s) => theme.setMode(s.first),
+                          style: ButtonStyle(
+                            side: WidgetStateProperty.all(BorderSide.none),
+                            backgroundColor: WidgetStateProperty.resolveWith(
+                              (st) => st.contains(WidgetState.selected) ? AppColors.mocca : AppColors.chip,
+                            ),
+                            foregroundColor: WidgetStateProperty.resolveWith(
+                              (st) => st.contains(WidgetState.selected) ? Colors.white : AppColors.brown,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('Pilihan tema tersimpan di perangkat.', style: TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -179,7 +241,7 @@ class ProfileScreen extends StatelessWidget {
                         if (!ok || !context.mounted) return;
                         await context.read<CollabNoteService>().logoutAccount();
                         if (!context.mounted) return;
-                        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const AuthScreen()), (route) => false);
+                        Navigator.of(context).pushAndRemoveUntil(fadeScaleRoute<void>(const AuthScreen()), (route) => false);
                       },
                     ),
                     const Divider(height: 1),

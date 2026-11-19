@@ -32,32 +32,40 @@ class HomeScreen extends StatelessWidget {
               onAction: viewModel.load,
             );
           }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-            children: [
-              Row(
-                children: [
-                  const Expanded(child: Text('Beranda', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800))),
-                  const LogoCircleButton(),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text('Halo, ${viewModel.userFirstName}!', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              Text(formatLongDate(DateTime.now()), style: const TextStyle(fontSize: 13)),
-              const SizedBox(height: 14),
-              _SummaryGrid(viewModel: viewModel),
-              if (viewModel.overdue > 0) ...[
-                const SizedBox(height: 12),
-                _Banner(
-                  icon: Icons.warning_amber_rounded,
-                  text: '${viewModel.overdue} tugas terlambat',
-                  background: AppColors.dangerSoft,
-                  foreground: AppColors.danger,
+          return RefreshIndicator(
+            color: AppColors.mocca,
+            onRefresh: viewModel.refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Text('Beranda', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800))),
+                    const LogoCircleButton(),
+                  ],
                 ),
+                const SizedBox(height: 14),
+                // Header gelombang (CustomClipper) + donat statistik (CustomPainter).
+                _GreetingHeader(viewModel: viewModel),
+                const SizedBox(height: 12),
+                _SummaryGrid(viewModel: viewModel),
+                if (viewModel.overdue > 0) ...[
+                  const SizedBox(height: 12),
+                  _Banner(
+                    icon: Icons.warning_amber_rounded,
+                    text: '${viewModel.overdue} tugas terlambat',
+                    background: AppColors.dangerSoft,
+                    foreground: AppColors.danger,
+                  ),
+                ],
+                if (!viewModel.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  _WeekCard(viewModel: viewModel),
+                ],
+                if (viewModel.isEmpty) _buildEmpty(context) else ..._buildPopulated(context),
               ],
-              if (viewModel.isEmpty) _buildEmpty(context) else ..._buildPopulated(context),
-            ],
+            ),
           );
         },
       ),
@@ -67,13 +75,15 @@ class HomeScreen extends StatelessWidget {
   Widget _buildEmpty(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 28),
-        Image.asset('assets/images/empty_assignments.png', height: 190),
-        const SizedBox(height: 28),
-        PrimaryButton(
-          label: 'Buat Penugasan Baru',
-          color: AppColors.brown,
-          onPressed: () => startCreateAssignment(context),
+        SizedBox(
+          height: 360,
+          child: EmptyState(
+            image: 'assets/images/empty_assignments.png',
+            title: 'Belum ada penugasan',
+            message: 'Catat tugas pertama Anda dan mulai atur deadline-nya.',
+            actionLabel: 'Buat Penugasan Baru',
+            onAction: () => startCreateAssignment(context),
+          ),
         ),
       ],
     );
@@ -105,7 +115,8 @@ class HomeScreen extends StatelessWidget {
               assignment: upcoming[i],
               repo: repo,
               highlighted: i == 0,
-              onTap: () => openAssignmentDetail(context, upcoming[i].id),
+              heroTag: 'asg-${upcoming[i].id}-home-up',
+              onTap: () => openAssignmentDetail(context, upcoming[i].id, heroTag: 'asg-${upcoming[i].id}-home-up'),
             ),
           ),
       ],
@@ -125,7 +136,8 @@ class HomeScreen extends StatelessWidget {
             child: _RecentCard(
               assignment: a,
               repo: repo,
-              onTap: () => openAssignmentDetail(context, a.id),
+              heroTag: 'asg-${a.id}-home-recent',
+              onTap: () => openAssignmentDetail(context, a.id, heroTag: 'asg-${a.id}-home-recent'),
             ),
           ),
       ],
@@ -206,9 +218,10 @@ class _DeadlineCard extends StatelessWidget {
   final AssignmentModel assignment;
   final AssignmentRepository repo;
   final bool highlighted;
+  final String heroTag;
   final VoidCallback onTap;
 
-  const _DeadlineCard({required this.assignment, required this.repo, required this.highlighted, required this.onTap});
+  const _DeadlineCard({required this.assignment, required this.repo, required this.highlighted, required this.heroTag, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -225,11 +238,26 @@ class _DeadlineCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${assignment.title} (${repo.courseName(assignment)})',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w700),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${assignment.title} (${repo.courseName(assignment)})',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ModeBadge(
+                  icon: assignment.isGroup ? Icons.groups_2_outlined : Icons.person_outline,
+                  size: 38,
+                  heroTag: heroTag,
+                  background: highlighted ? Colors.white24 : Colors.white.withValues(alpha: 0.7),
+                  foreground: fg,
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
@@ -256,9 +284,10 @@ class _DeadlineCard extends StatelessWidget {
 class _RecentCard extends StatelessWidget {
   final AssignmentModel assignment;
   final AssignmentRepository repo;
+  final String heroTag;
   final VoidCallback onTap;
 
-  const _RecentCard({required this.assignment, required this.repo, required this.onTap});
+  const _RecentCard({required this.assignment, required this.repo, required this.heroTag, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -271,11 +300,24 @@ class _RecentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${assignment.title} (${repo.courseName(assignment)})',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${assignment.title} (${repo.courseName(assignment)})',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ModeBadge(
+                  icon: assignment.isGroup ? Icons.groups_2_outlined : Icons.person_outline,
+                  size: 38,
+                  heroTag: heroTag,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(
@@ -322,6 +364,101 @@ class _ActionRow extends StatelessWidget {
             Text(days, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Header sapaan: gradasi bergelombang + donat distribusi status penugasan.
+class _GreetingHeader extends StatelessWidget {
+  final HomeViewModel viewModel;
+
+  const _GreetingHeader({required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget legend(String label, int value, Color color) => Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text('$label $value', style: const TextStyle(color: Colors.white, fontSize: 12)),
+            ],
+          ),
+        );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: WaveHeader(
+        height: 196,
+        padding: const EdgeInsets.fromLTRB(20, 18, 14, 38),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Halo, ${viewModel.userFirstName}!', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(formatLongDate(DateTime.now()), style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+                  const SizedBox(height: 8),
+                  legend('Belum', viewModel.notStarted, AppColors.beige),
+                  legend('Proses', viewModel.inProgress, AppColors.yellow),
+                  legend('Selesai', viewModel.completed, AppColors.mint),
+                ],
+              ),
+            ),
+            DonutChart(
+              size: 112,
+              strokeWidth: 13,
+              slices: [
+                DonutSlice(viewModel.notStarted.toDouble(), AppColors.beige),
+                DonutSlice(viewModel.inProgress.toDouble(), AppColors.yellow),
+                DonutSlice(viewModel.completed.toDouble(), AppColors.mint),
+              ],
+              center: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${viewModel.total}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                  const Text('tugas', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Grafik batang custom: jumlah deadline pada 7 hari ke depan.
+class _WeekCard extends StatelessWidget {
+  final HomeViewModel viewModel;
+
+  const _WeekCard({required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = viewModel.weekCounts;
+    final total = counts.fold<int>(0, (a, b) => a + b);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(18)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('Deadline 7 Hari ke Depan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+              Text(total == 0 ? 'Aman' : '$total tugas', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          WeekBars(counts: counts, labels: viewModel.weekLabels, highlight: 0, height: 118),
+        ],
       ),
     );
   }

@@ -61,7 +61,7 @@ class _FinalizationScreenState extends State<FinalizationScreen> {
       builder: (context, _) {
         final a = vm.assignment;
         if (a == null || !vm.hasWorkspace) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(body: ShimmerLoading());
         }
         final checks = vm.finalChecks;
         final finals = vm.finalDocuments;

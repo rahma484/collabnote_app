@@ -18,6 +18,8 @@ dependencies:
   web: ^1.1.1
   open_filex: ^5.0.0
   path_provider: ^2.1.6
+  archive: '>=3.6.1 <4.0.0'
+  xml: ^6.5.0
 
 dev_dependencies:
   flutter_test:

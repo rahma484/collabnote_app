@@ -112,38 +112,100 @@ class AssignmentsScreen extends StatelessWidget {
     }
     final list = viewModel.filtered;
     if (list.isEmpty) {
-      return const EmptyState(icon: Icons.search_off, message: 'Tidak ada penugasan yang cocok dengan pencarian atau filter.');
+      return const EmptyState(icon: Icons.search_off, title: 'Tidak ada hasil', message: 'Tidak ada penugasan yang cocok dengan pencarian atau filter.');
     }
+    return _AssignmentList(viewModel: viewModel);
+  }
+}
 
-    final repo = viewModel.assignments;
+/// Daftar penugasan dengan tarik-untuk-memuat-ulang dan infinite scroll.
+class _AssignmentList extends StatefulWidget {
+  final AssignmentsViewModel viewModel;
+
+  const _AssignmentList({required this.viewModel});
+
+  @override
+  State<_AssignmentList> createState() => _AssignmentListState();
+}
+
+class _AssignmentListState extends State<_AssignmentList> {
+  final ScrollController _scroll = ScrollController();
+
+  AssignmentsViewModel get vm => widget.viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 200) vm.loadMore();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _card(BuildContext context, AssignmentRepository repo, AssignmentModel a, int index) {
+    final tag = 'asg-${a.id}-list';
+    return AnimatedAppear(
+      index: index,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: AssignmentCard(
+          assignment: a,
+          repo: repo,
+          heroTag: tag,
+          onTap: () => openAssignmentDetail(context, a.id, heroTag: tag),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = vm.assignments;
+    final list = vm.visible;
     final children = <Widget>[];
-    if (viewModel.groupByCourse) {
+    if (vm.groupByCourse) {
       final byCourse = <String, List<AssignmentModel>>{};
       for (final a in list) {
         byCourse.putIfAbsent(repo.courseName(a), () => []).add(a);
       }
       final names = byCourse.keys.toList()..sort();
+      var i = 0;
       for (final name in names) {
         children.add(SectionTitle(name));
         for (final a in byCourse[name]!) {
-          children.add(_card(context, repo, a));
+          children.add(_card(context, repo, a, i++));
         }
       }
     } else {
-      for (final a in list) {
-        children.add(_card(context, repo, a));
+      for (var i = 0; i < list.length; i++) {
+        children.add(_card(context, repo, list[i], i));
       }
     }
-    return ListView(padding: const EdgeInsets.only(bottom: 90), children: children);
-  }
-
-  Widget _card(BuildContext context, AssignmentRepository repo, AssignmentModel a) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AssignmentCard(
-        assignment: a,
-        repo: repo,
-        onTap: () => openAssignmentDetail(context, a.id),
+    return RefreshIndicator(
+      color: AppColors.mocca,
+      onRefresh: vm.refresh,
+      child: ListView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 90),
+        children: [
+          ...children,
+          if (vm.isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: SizedBox(height: 104, child: SkeletonList(count: 1, padding: EdgeInsets.zero)),
+            )
+          else if (!vm.hasMore && list.length > AssignmentsViewModel.pageSize)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(child: Text('Semua penugasan sudah ditampilkan', style: TextStyle(fontSize: 12, color: AppColors.textMuted))),
+            ),
+        ],
       ),
     );
   }
@@ -154,8 +216,9 @@ class AssignmentCard extends StatelessWidget {
   final AssignmentModel assignment;
   final AssignmentRepository repo;
   final VoidCallback onTap;
+  final String? heroTag;
 
-  const AssignmentCard({super.key, required this.assignment, required this.repo, required this.onTap});
+  const AssignmentCard({super.key, required this.assignment, required this.repo, required this.onTap, this.heroTag});
 
   @override
   Widget build(BuildContext context) {
@@ -185,11 +248,26 @@ class AssignmentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${assignment.title} (${repo.courseName(assignment)})',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w600),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${assignment.title} (${repo.courseName(assignment)})',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ModeBadge(
+                  icon: assignment.isGroup ? Icons.groups_2_outlined : Icons.person_outline,
+                  size: 38,
+                  heroTag: heroTag,
+                  background: dark ? AppColors.brown : Colors.white.withValues(alpha: 0.7),
+                  foreground: dark ? Colors.white : AppColors.brown,
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(

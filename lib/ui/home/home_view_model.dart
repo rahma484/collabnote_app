@@ -31,6 +31,36 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
+  /// Tarik-untuk-memuat-ulang: membaca ulang profil dan penugasan dari sumber data.
+  Future<void> refresh() async {
+    try {
+      await Future.wait([profile.load(force: true), assignments.load(force: true)]);
+      error = null;
+    } catch (e) {
+      error = 'Gagal memuat Beranda: $e';
+    }
+    notifyListeners();
+  }
+
+  /// Jumlah deadline (penugasan belum selesai) untuk 7 hari ke depan, mulai hari ini.
+  List<int> get weekCounts {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    final counts = List<int>.filled(7, 0);
+    for (final a in assignments.assignments.where((a) => !a.status.isFinal)) {
+      final d = DateTime(a.deadline.year, a.deadline.month, a.deadline.day);
+      final diff = d.difference(start).inDays;
+      if (diff >= 0 && diff < 7) counts[diff]++;
+    }
+    return counts;
+  }
+
+  List<String> get weekLabels {
+    const names = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    final today = DateTime.now();
+    return [for (var i = 0; i < 7; i++) i == 0 ? 'Hari ini' : names[today.add(Duration(days: i)).weekday % 7]];
+  }
+
   String get userFirstName => profile.user.firstName;
 
   int get total => assignments.totalCount;

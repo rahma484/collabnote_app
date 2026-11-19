@@ -196,6 +196,13 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   Future<void> deleteDocument(DocumentModel doc) => workspaces.deleteDocument(doc.id);
 
+  /// Byte dokumen untuk dibuka langsung di dalam aplikasi (pratinjau).
+  Future<Uint8List?> bytesOfDocument(DocumentModel doc) => workspaces.bytesOf(doc);
+
+  Future<Uint8List?> bytesOfAttachment(WorkItemModel item) => files.readBytes(item.attachmentPath);
+
+  Future<Uint8List?> bytesOfSubmission(SubmissionModel s) => files.readBytes(s.localPath);
+
   Future<String> downloadDocument(DocumentModel doc) async {
     final bytes = await workspaces.bytesOf(doc);
     if (bytes == null) return 'File tidak tersedia.';

@@ -16,6 +16,7 @@ import '../core/app_colors.dart';
 import '../core/app_widgets.dart';
 import '../core/formatters.dart';
 import '../shell/navigation_controller.dart';
+import '../viewer/document_viewer_screen.dart';
 import '../workspace/documents_screen.dart';
 import '../workspace/references_screen.dart';
 
@@ -23,7 +24,10 @@ import '../workspace/references_screen.dart';
 class ArchiveDetailScreen extends StatelessWidget {
   final String archiveId;
 
-  const ArchiveDetailScreen({super.key, required this.archiveId});
+  /// Tag Hero lencana arsip dari kartu asal (null bila dibuka tanpa Hero).
+  final String? heroTag;
+
+  const ArchiveDetailScreen({super.key, required this.archiveId, this.heroTag});
 
   Future<void> _export(BuildContext context, ArchiveModel a) async {
     final ws = context.read<WorkspaceRepository>();
@@ -87,7 +91,7 @@ class ArchiveDetailScreen extends StatelessWidget {
     final ws = context.watch<WorkspaceRepository>();
     final a = archives.byId(archiveId);
     if (a == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: ShimmerLoading());
     }
 
     final finalDocs =
@@ -137,9 +141,21 @@ class ArchiveDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          Text('Detail Arsip: ${a.title}',
-              style: const TextStyle(
-                  fontSize: 25, fontWeight: FontWeight.w800, height: 1.2)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text('Detail Arsip: ${a.title}',
+                    style: const TextStyle(
+                        fontSize: 25, fontWeight: FontWeight.w800, height: 1.2)),
+              ),
+              const SizedBox(width: 10),
+              ModeBadge(
+                  icon: Icons.inventory_2_outlined,
+                  size: 48,
+                  heroTag: heroTag),
+            ],
+          ),
           const SizedBox(height: 10),
           const Align(
               alignment: Alignment.centerLeft,
@@ -242,7 +258,19 @@ class _DocumentsView extends StatelessWidget {
                 for (final d in docs)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Container(
+                    child: PressableScale(
+                      onTap: () async {
+                        final bytes =
+                            await context.read<WorkspaceRepository>().bytesOf(d);
+                        if (!context.mounted) return;
+                        if (bytes == null) {
+                          showSnack(context, 'File tidak tersedia.');
+                          return;
+                        }
+                        await openFileInApp(context,
+                            fileName: d.fileName, bytes: bytes, title: d.title);
+                      },
+                      child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                           color: AppColors.card,
@@ -290,6 +318,7 @@ class _DocumentsView extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   ),
               ],

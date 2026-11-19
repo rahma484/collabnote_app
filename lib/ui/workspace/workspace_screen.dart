@@ -146,24 +146,11 @@ class WorkspaceScreen extends StatelessWidget {
     final pct = (vm.progress * 100).round();
     return [
       Center(
-        child: SizedBox(
-          width: 150,
-          height: 150,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox.expand(
-                child: CircularProgressIndicator(
-                  value: vm.progress,
-                  strokeWidth: 14,
-                  strokeCap: StrokeCap.round,
-                  color: AppColors.mocca,
-                  backgroundColor: AppColors.chip,
-                ),
-              ),
-              Text('$pct%', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w500)),
-            ],
-          ),
+        child: ProgressRing(
+          value: vm.progress,
+          size: 150,
+          strokeWidth: 14,
+          center: Text('$pct%', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w500)),
         ),
       ),
       const SizedBox(height: 16),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../data/services/draft_store.dart';
 import '../../domain/models/note_model.dart';
 import '../core/app_colors.dart';
 import '../core/app_widgets.dart';
@@ -98,47 +100,139 @@ class _NoteCard extends StatelessWidget {
   }
 }
 
-/// Bottom sheet tambah / edit catatan.
+/// Bottom sheet tambah / edit catatan. Isi disimpan otomatis sebagai draf lokal
+/// (SharedPreferences) dan dipulihkan bila editor dibuka lagi sebelum disimpan.
 Future<void> showNoteEditor(BuildContext context, WorkspaceViewModel vm, {NoteModel? note}) {
-  final title = TextEditingController(text: note?.title ?? '');
-  final content = TextEditingController(text: note?.content ?? '');
-  final formKey = GlobalKey<FormState>();
+  final drafts = context.read<DraftStore>();
+  final key = 'note_${vm.assignment?.id ?? 'x'}_${note?.id ?? 'baru'}';
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+    builder: (ctx) => _NoteEditorSheet(vm: vm, note: note, drafts: drafts, draftKey: key),
+  );
+}
+
+class _NoteEditorSheet extends StatefulWidget {
+  final WorkspaceViewModel vm;
+  final NoteModel? note;
+  final DraftStore drafts;
+  final String draftKey;
+
+  const _NoteEditorSheet({required this.vm, required this.note, required this.drafts, required this.draftKey});
+
+  @override
+  State<_NoteEditorSheet> createState() => _NoteEditorSheetState();
+}
+
+class _NoteEditorSheetState extends State<_NoteEditorSheet> {
+  late final TextEditingController _title = TextEditingController(text: widget.note?.title ?? '');
+  late final TextEditingController _content = TextEditingController(text: widget.note?.content ?? '');
+  final _formKey = GlobalKey<FormState>();
+  bool _restored = false;
+  bool _saved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+    _title.addListener(_autoSave);
+    _content.addListener(_autoSave);
+  }
+
+  Future<void> _restore() async {
+    final d = await widget.drafts.load(widget.draftKey);
+    if (d == null || !mounted) return;
+    final t = d['title'] ?? '';
+    final c = d['content'] ?? '';
+    if (t.isEmpty && c.isEmpty) return;
+    if (t == _title.text && c == _content.text) return;
+    setState(() {
+      _title.text = t;
+      _content.text = c;
+      _restored = true;
+    });
+  }
+
+  void _autoSave() {
+    if (_saved) return;
+    widget.drafts.save(widget.draftKey, {'title': _title.text, 'content': _content.text});
+  }
+
+  Future<void> _discardDraft() async {
+    await widget.drafts.clear(widget.draftKey);
+    if (!mounted) return;
+    setState(() {
+      _title.text = widget.note?.title ?? '';
+      _content.text = widget.note?.content ?? '';
+      _restored = false;
+    });
+    // Hapus draf lagi: pengisian ulang di atas memicu auto-simpan.
+    await widget.drafts.clear(widget.draftKey);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    _saved = true;
+    if (widget.note == null) {
+      await widget.vm.addNote(_title.text, _content.text);
+    } else {
+      await widget.vm.updateNote(widget.note!.id, _title.text, _content.text);
+    }
+    await widget.drafts.clear(widget.draftKey);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _content.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
       child: Form(
-        key: formKey,
+        key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(note == null ? 'Tambah Catatan' : 'Edit Catatan', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 14),
+              Text(widget.note == null ? 'Tambah Catatan' : 'Edit Catatan', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: _restored
+                    ? Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                        decoration: BoxDecoration(color: AppColors.chip, borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.history, size: 18, color: AppColors.mocca),
+                            const SizedBox(width: 8),
+                            const Expanded(child: Text('Draf yang belum disimpan dipulihkan.', style: TextStyle(fontSize: 12.5))),
+                            TextButton(onPressed: _discardDraft, child: const Text('Buang')),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
               LabeledField(
                 label: 'Judul',
-                controller: title,
+                controller: _title,
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Judul wajib diisi' : null,
               ),
-              LabeledField(label: 'Isi Catatan', controller: content, maxLines: 6),
-              PrimaryButton(
-                label: 'Simpan Catatan',
-                onPressed: () async {
-                  if (!formKey.currentState!.validate()) return;
-                  if (note == null) {
-                    await vm.addNote(title.text, content.text);
-                  } else {
-                    await vm.updateNote(note.id, title.text, content.text);
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-              ),
+              LabeledField(label: 'Isi Catatan', controller: _content, maxLines: 6),
+              PrimaryButton(label: 'Simpan Catatan', onPressed: _submit),
             ],
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

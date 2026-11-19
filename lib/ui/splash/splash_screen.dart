@@ -6,11 +6,17 @@ import '../../data/repositories/profile_repository.dart';
 import '../../data/repositories/group_repository.dart';
 import '../../data/repositories/template_repository.dart';
 import '../core/app_colors.dart';
+import '../../data/services/collab_note_service.dart';
+import '../auth/auth_screen.dart';
+import '../core/app_widgets.dart';
 import '../shell/app_shell.dart';
 
 /// Splash Screen: logo, nama, tagline, dan indikator memuat. Data dimuat selagi splash tampil.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  /// quick = true setelah login/registrasi (tidak perlu menunggu animasi pembuka lama).
+  final bool quick;
+
+  const SplashScreen({super.key, this.quick = false});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -29,19 +35,18 @@ class _SplashScreenState extends State<SplashScreen> {
     setState(() => _error = null);
     try {
       await Future.wait([
-        Future.delayed(const Duration(milliseconds: 1800)),
+        Future.delayed(Duration(milliseconds: widget.quick ? 600 : 1800)),
         context.read<ProfileRepository>().load(force: true),
         context.read<GroupRepository>().load(force: true),
         context.read<TemplateRepository>().load(),
         context.read<AssignmentRepository>().load(),
       ]);
       if (!mounted) return;
+      // Sudah ada sesi akun aktif -> langsung ke aplikasi; bila belum -> layar Masuk/Registrasi.
+      final loggedIn = await context.read<CollabNoteService>().hasActiveAccount();
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        PageRouteBuilder<void>(
-          transitionDuration: const Duration(milliseconds: 400),
-          pageBuilder: (_, __, ___) => const AppShell(),
-          transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
-        ),
+        fadeScaleRoute<void>(loggedIn ? const AppShell() : const AuthScreen()),
       );
     } catch (e) {
       if (mounted) setState(() => _error = 'Gagal memuat data. Coba lagi.');
@@ -61,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset('assets/images/logo_collabnote.png', height: 150),
+              Hero(tag: 'app-logo', child: Image.asset('assets/images/logo_collabnote.png', height: 150)),
               const SizedBox(height: 14),
               RichText(
                 text: const TextSpan(
@@ -76,11 +81,7 @@ class _SplashScreenState extends State<SplashScreen> {
               const Text('Plan  •  Create  •  Collaborate', style: TextStyle(color: AppColors.brown, fontSize: 14)),
               const SizedBox(height: 40),
               if (_error == null)
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.beige),
-                )
+                const ShimmerBar(width: 150, height: 8)
               else ...[
                 Text(_error!, style: const TextStyle(color: AppColors.danger)),
                 const SizedBox(height: 8),

@@ -71,9 +71,37 @@ class ArchiveViewModel extends ChangeNotifier {
   }
 
   /// Pengelompokan: semester, lalu mata kuliah (urutan terbaru di atas).
+  // Infinite scroll: arsip ditampilkan bertahap.
+  static const int pageSize = 5;
+  int visibleCount = pageSize;
+  bool isLoadingMore = false;
+
+  bool get hasMore => visibleCount < filtered.length;
+
+  Future<void> refresh() async {
+    try {
+      await repository.load(force: true);
+      error = null;
+    } catch (e) {
+      error = 'Gagal memuat arsip: $e';
+    }
+    visibleCount = pageSize;
+    notifyListeners();
+  }
+
+  Future<void> loadMore() async {
+    if (isLoadingMore || !hasMore) return;
+    isLoadingMore = true;
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 600)); // simulasi permintaan jaringan
+    visibleCount += pageSize;
+    isLoadingMore = false;
+    notifyListeners();
+  }
+
   Map<String, List<ArchiveModel>> get grouped {
     final map = <String, List<ArchiveModel>>{};
-    for (final a in filtered) {
+    for (final a in filtered.take(visibleCount)) {
       map.putIfAbsent('Semester ${a.semester}  -  ${a.courseName}', () => []).add(a);
     }
     return map;
@@ -81,11 +109,13 @@ class ArchiveViewModel extends ChangeNotifier {
 
   void setQuery(String v) {
     query = v;
+    visibleCount = pageSize;
     notifyListeners();
   }
 
   void setFilter(String v) {
     filter = v;
+    visibleCount = pageSize;
     notifyListeners();
   }
 
